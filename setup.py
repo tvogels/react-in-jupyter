@@ -10,6 +10,5 @@ setup(
     author_email="t.vogels@me.com",
     url="https://github.com/tvogels/react-in-jupyter",
     packages=["react_jupyter"],
-    include_package_data=True,
     package_data={"react_jupyter": ["setup.js"]},
 )
