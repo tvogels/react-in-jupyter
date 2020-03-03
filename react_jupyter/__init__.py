@@ -6,7 +6,7 @@ import string
 import numpy as np
 import pandas as pd
 from IPython.core.display import Javascript, clear_output, display
-from IPython.core.magic import register_cell_magic
+from IPython.core.magic import register_cell_magic, register_line_magic
 
 
 def init():
@@ -40,35 +40,44 @@ def calling_scope_variable(name):
 @register_cell_magic
 def jsx(line, cell):
     code_template = """
-    require(['babel', 'react', 'react-dom'], (Babel, React, ReactDOM) => {
-        const cell = new Cell(element[0]);
-        const render = cell.render.bind(cell);
-        const onCleanup = cell.onCleanup.bind(cell);
-        
-        try {
-            const babelOutput = Babel.transform($quoted_script, {presets: ['es2015', 'react', 'stage-2']})
-            eval(babelOutput.code);
-        } catch (e) {
-            cell.renderError(e.message);
+    if (!window.REACT_JUPYTER_SETUP_LOADED) {
+        element[0].innerHTML = "Make sure to run <code>react_jupyter.init()</code> before this cell.";
+    } else {
+        require(['babel', 'react', 'react-dom'], (Babel, React, ReactDOM) => {
+            const cell = new Cell(element[0]);
+            const onCleanup = cell.onCleanup.bind(cell);
+            const render = cell.render.bind(cell);
+            const dependHandle = depend($dependency_list, ($dependency_dict) => {
+                try {
+                    const babelOutput = Babel.transform($quoted_script, {presets: ['es2015', 'react', 'stage-2']})
+                    eval(babelOutput.code);
+                } catch (e) {
+                    cell.renderError(e.message);
+                }
+            });
+            onCleanup(dependHandle);
+        })
         }
-    })
     """
 
     code = []
 
-    # for variable in variable_pattern.findall(cell):
-    for variable in line.split(","):
-        variable = variable.strip()
-        if len(variable) > 0:
-            value = json.dumps(calling_scope_variable(variable), cls=CustomJSONEncoder)
-            code.append(f"const {variable.strip()} = {value};")
+    dependency_list = []
+    for dep in line.split(" "):
+        if len(dep) > 0:
+            dependency_list.append(dep)
 
-    display(
-        Javascript(
-            (
-                string.Template(code_template).substitute(
-                    quoted_script=json.dumps("\n".join(code + [cell]))
-                )
-            )
+    execute_js(
+        string.Template(code_template).substitute(
+            quoted_script=json.dumps("\n".join(code + [cell])),
+            dependency_list=json.dumps(dependency_list),
+            dependency_dict="{ " + ", ".join(dependency_list) + " }",
         )
     )
+
+
+@register_line_magic
+def publish(line):
+    variables = line.split(" ")
+    pairs = [[v, calling_scope_variable(v)] for v in variables]
+    execute_js("publishMany(" + json.dumps(pairs, cls=CustomJSONEncoder) + ");")

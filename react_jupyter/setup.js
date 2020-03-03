@@ -1,3 +1,5 @@
+window.REACT_JUPYTER_SETUP_LOADED = true;
+
 /**
  * RequireJS dependencies
  */
@@ -5,7 +7,18 @@ require.config({
     paths: {
         babel: "https://unpkg.com/babel-standalone@6/babel.min",
         react: "https://unpkg.com/react@16.13.0/umd/react.production.min",
-        "react-dom": "https://unpkg.com/react-dom@16.13.0/umd/react-dom.production.min"
+        "react-dom": "https://unpkg.com/react-dom@16.13.0/umd/react-dom.production.min",
+        flexvg: "https://unpkg.com/flexvg@0.0.5/dist/flexvg.umd",
+        "d3-scale": "https://unpkg.com/d3-scale@3.2.1/dist/d3-scale.min",
+        "d3-shape": "https://unpkg.com/d3-shape@1.3.7/dist/d3-shape.min",
+        "d3-scale-chromatic": "https://unpkg.com/d3-scale-chromatic@1.5.0/dist/d3-scale-chromatic.min",
+        "d3-array": "https://unpkg.com/d3-array@2.4.0/dist/d3-array",
+        "d3-path": "https://unpkg.com/d3-path@1.0.9/dist/d3-path.min",
+        "d3-format": "https://unpkg.com/d3-format@1.4.3/dist/d3-format.min",
+        "d3-time": "https://unpkg.com/d3-time@1.1.0/dist/d3-time.min",
+        "d3-time-format": "https://unpkg.com/d3-time-format@2.2.3/dist/d3-time-format",
+        "d3-interpolate": "https://unpkg.com/d3-interpolate@1.4.0/dist/d3-interpolate.min",
+        "d3-color": "https://unpkg.com/d3-color@1.4.0/dist/d3-color.min"
     }
 });
 
@@ -109,6 +122,10 @@ class Cell {
         });
     }
 
+    get width() {
+        return this.elem.clientWidth;
+    }
+
     renderError(errorMessage) {
         require(["react"], React => {
             this.render(
@@ -164,3 +181,51 @@ class Cell {
 }
 
 window.Cell = Cell;
+
+const registry = new Map();
+const dependencies = new Set();
+
+function publishMany(pairs) {
+    for (const [variable, value] of pairs) {
+        registry.set(variable, value);
+    }
+    const changedVariables = pairs.map(p => p[0]);
+    for (const { variables, callback } of dependencies) {
+        const nonZeroIntersection = changedVariables.find(v => variables.has(v));
+        if (nonZeroIntersection) {
+            const values = {};
+            for (const v of variables) {
+                values[v] = registry.get(v);
+            }
+            callback(values);
+        }
+    }
+}
+window.publishMany = publishMany;
+window.publish = (variable, value) => publishMany([[variable, value]]);
+
+function depend(variables, callback) {
+    variables = new Set(variables);
+    const obj = { variables, callback };
+    dependencies.add(obj);
+
+    const values = {};
+    for (const v of variables) {
+        values[v] = registry.get(v);
+    }
+    callback(values);
+
+    return () => dependencies.delete(obj);
+}
+window.depend = depend;
+
+let previousCellWidth = null;
+function updateCellWidth() {
+    const width = Math.round(document.getElementsByClassName("inner_cell")[0].clientWidth - 7);
+    if (width !== previousCellWidth) {
+        previousCellWidth = width;
+        publish("width", width);
+    }
+}
+updateCellWidth();
+window.addEventListener("resize", updateCellWidth);
