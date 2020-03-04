@@ -4,7 +4,7 @@ from distutils.core import setup
 
 setup(
     name="react-in-jupyter",
-    version="0.3",
+    version="0.4",
     description="Use React and JSX to build cells in Jupyter Notebooks",
     author="Thijs Vogels",
     author_email="t.vogels@me.com",
