@@ -116,14 +116,15 @@ class Cell {
         this._listenForCleanup();
     }
 
+    cleanupAndReset() {
+        this._cleanup();
+        this._listenForCleanup();
+    }
+
     render(tree) {
         require(["react-dom"], ReactDOM => {
             ReactDOM.render(tree, this.elem);
         });
-    }
-
-    get width() {
-        return this.elem.clientWidth;
     }
 
     renderError(errorMessage) {
@@ -157,6 +158,7 @@ class Cell {
         for (let callback of this.cleanupCallbacks) {
             callback();
         }
+        this.cleanupCallbacks = [];
     }
 
     _listenForCleanup() {

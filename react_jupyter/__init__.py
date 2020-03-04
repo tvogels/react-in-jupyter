@@ -47,7 +47,8 @@ def jsx(line, cell):
             const cell = new Cell(element[0]);
             const onCleanup = cell.onCleanup.bind(cell);
             const render = cell.render.bind(cell);
-            const dependHandle = depend($dependency_list, ($dependency_dict) => {
+            const dependHandle = depend($dependency_list, ({ $dependency_dict }) => {
+                cell.cleanupAndReset();
                 try {
                     const babelOutput = Babel.transform($quoted_script, {presets: ['es2015', 'react', 'stage-2']})
                     eval(babelOutput.code);
@@ -71,7 +72,7 @@ def jsx(line, cell):
         string.Template(code_template).substitute(
             quoted_script=json.dumps("\n".join(code + [cell])),
             dependency_list=json.dumps(dependency_list),
-            dependency_dict="{ " + ", ".join(dependency_list) + " }",
+            dependency_dict=", ".join(dependency_list),
         )
     )
 
