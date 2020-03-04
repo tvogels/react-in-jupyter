@@ -3,6 +3,11 @@ window.REACT_JUPYTER_SETUP_LOADED = true;
 /**
  * RequireJS dependencies
  */
+// require(["https://cdn.jsdelivr.net/npm/d3-require@1"], ({ requireFrom }) => {
+//     window.d3require = requireFrom(async name => {
+//         return `https://unpkg.com/${name}`;
+//     });
+// });
 require.config({
     paths: {
         babel: "https://unpkg.com/babel-standalone@6/babel.min",
