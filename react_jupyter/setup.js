@@ -17,7 +17,6 @@ window.d3require = library => {
             });
         });
     } else {
-        console.log("we already have d3require");
         return d3requireLoaded(library);
     }
 };
