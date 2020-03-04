@@ -90,24 +90,13 @@ print(json.dumps(${variableName}, cls=CustomJSONEncoder))`.trim();
  */
 Jupyter.CodeCell.options_default.highlight_modes.magic_jsx = { reg: ["^%%jsx"] };
 
-const findParentOutputDiv = el => {
-    let candidate = el;
-    while (candidate) {
-        candidate = candidate.parentElement;
-        if (candidate.className === "output") {
-            return candidate;
-        }
-    }
-    throw Error("parent output div not found");
-};
-
 /**
- *
+ * A Cell handles rendering and cleanup
  */
 class Cell {
     constructor(element) {
         this.elem = element;
-        this.outputDiv = findParentOutputDiv(element);
+        this.outputDiv = this._findParentOutputDiv(element);
         this.notebookElement = this.outputDiv.parentElement.parentElement;
         this.notebookContainer = this.notebookElement.parentElement;
 
@@ -180,53 +169,78 @@ class Cell {
         cellDeletionDetector.observe(this.notebookContainer, { childList: true });
         this.onCleanup(() => cellDeletionDetector.disconnect());
     }
+
+    _findParentOutputDiv(el) {
+        let candidate = el;
+        while (candidate) {
+            candidate = candidate.parentElement;
+            if (candidate.className === "output") {
+                return candidate;
+            }
+        }
+        throw Error("parent output div not found");
+    }
 }
 
 window.Cell = Cell;
 
-const registry = new Map();
-const dependencies = new Set();
-
-function publishMany(pairs) {
-    for (const [variable, value] of pairs) {
-        registry.set(variable, value);
+class Registry {
+    constructor() {
+        this.registry = new Map();
+        this.dependencies = new Set();
     }
-    const changedVariables = pairs.map(p => p[0]);
-    for (const { variables, callback } of dependencies) {
-        const nonZeroIntersection = changedVariables.find(v => variables.has(v));
-        if (nonZeroIntersection) {
-            const values = {};
-            for (const v of variables) {
-                values[v] = registry.get(v);
+
+    publishMany(pairs) {
+        for (const [variable, value] of pairs) {
+            this.registry.set(variable, value);
+        }
+        const changedVariables = pairs.map(p => p[0]);
+        for (const { variables, callback } of this.dependencies) {
+            const nonZeroIntersection = changedVariables.find(v => variables.has(v));
+            if (nonZeroIntersection) {
+                this.call(variables, callback);
             }
-            callback(values);
         }
     }
-}
-window.publishMany = publishMany;
-window.publish = (variable, value) => publishMany([[variable, value]]);
 
-function depend(variables, callback) {
-    variables = new Set(variables);
-    const obj = { variables, callback };
-    dependencies.add(obj);
-
-    const values = {};
-    for (const v of variables) {
-        values[v] = registry.get(v);
+    call(variables, callback) {
+        const values = {};
+        for (const v of variables) {
+            values[v] = this.get(v);
+        }
+        callback(values);
     }
-    callback(values);
 
-    return () => dependencies.delete(obj);
+    publish(variable, value) {
+        this.publishMany([[variable, value]]);
+    }
+
+    get(variable) {
+        return this.registry.get(variable);
+    }
+
+    listen(variables, callback) {
+        variables = new Set(variables);
+        const obj = { variables, callback };
+        this.dependencies.add(obj);
+
+        this.call(variables, callback);
+
+        return () => this.dependencies.delete(obj);
+    }
 }
-window.depend = depend;
+window.registry = new Registry();
 
+/**
+ * Registry entry for the width of a code cell,
+ * so cells can auto-update on resize.
+ */
 let previousCellWidth = null;
 function updateCellWidth() {
     const width = Math.round(document.getElementsByClassName("inner_cell")[0].clientWidth - 7);
     if (width !== previousCellWidth) {
         previousCellWidth = width;
-        publish("width", width);
+        registry.publish("width", width);
     }
 }
 updateCellWidth();
