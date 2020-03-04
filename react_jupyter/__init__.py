@@ -45,10 +45,13 @@ def jsx(line, cell):
     } else {
         require(['babel', 'react', 'react-dom'], (Babel, React, ReactDOM) => {
             const cell = new Cell(element[0]);
-            const onCleanup = cell.onCleanup.bind(cell);
             const render = cell.render.bind(cell);
+
+            const cleanupManager = cell.cleanupManager.childScope();
+            const onCleanup = cleanupManager.register.bind(cleanupManager);
+
             const dependHandle = registry.listen($dependency_list, ({ $dependency_dict }) => {
-                cell.cleanupAndReset();
+                cleanupManager.cleanup(); // Clean up from the previous iteration
                 try {
                     const babelOutput = Babel.transform($quoted_script, {presets: ['es2015', 'react', 'stage-2']})
                     eval(babelOutput.code);
@@ -56,7 +59,7 @@ def jsx(line, cell):
                     cell.renderError(e.message);
                 }
             });
-            onCleanup(dependHandle);
+            cell.cleanupManager.register(dependHandle);
         })
         }
     """

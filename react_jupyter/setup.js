@@ -95,6 +95,26 @@ print(json.dumps(${variableName}, cls=CustomJSONEncoder))`.trim();
  */
 Jupyter.CodeCell.options_default.highlight_modes.magic_jsx = { reg: ["^%%jsx"] };
 
+class CleanupManager {
+    constructor() {
+        this.callbacks = [];
+    }
+    register(callback) {
+        this.callbacks.push(callback);
+    }
+    cleanup() {
+        for (let callback of this.callbacks) {
+            callback();
+        }
+        this.callbacks = [];
+    }
+    childScope() {
+        const manager = new CleanupManager();
+        this.register(() => manager.cleanup());
+        return manager;
+    }
+}
+
 /**
  * A Cell handles rendering and cleanup
  */
@@ -105,13 +125,8 @@ class Cell {
         this.notebookElement = this.outputDiv.parentElement.parentElement;
         this.notebookContainer = this.notebookElement.parentElement;
 
-        this.cleanupCallbacks = [];
+        this.cleanupManager = new CleanupManager();
 
-        this._listenForCleanup();
-    }
-
-    cleanupAndReset() {
-        this._cleanup();
         this._listenForCleanup();
     }
 
@@ -144,21 +159,14 @@ class Cell {
         });
     }
 
-    onCleanup(callback) {
-        this.cleanupCallbacks.push(callback);
-    }
-
     _cleanup() {
-        for (let callback of this.cleanupCallbacks) {
-            callback();
-        }
-        this.cleanupCallbacks = [];
+        this.cleanupManager.cleanup();
     }
 
     _listenForCleanup() {
         const reExecuteDetector = new MutationObserver(this._cleanup.bind(this));
         reExecuteDetector.observe(this.outputDiv, { childList: true });
-        this.onCleanup(() => reExecuteDetector.disconnect());
+        this.cleanupManager.register(() => reExecuteDetector.disconnect());
 
         const cellDeletionDetector = new MutationObserver(mutationRecord => {
             for (let mutation of mutationRecord) {
@@ -172,7 +180,7 @@ class Cell {
             }
         });
         cellDeletionDetector.observe(this.notebookContainer, { childList: true });
-        this.onCleanup(() => cellDeletionDetector.disconnect());
+        this.cleanupManager.register(() => cellDeletionDetector.disconnect());
     }
 
     _findParentOutputDiv(el) {
