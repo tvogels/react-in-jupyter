@@ -43,17 +43,19 @@ def jsx(line, cell):
     if (!window.REACT_JUPYTER_SETUP_LOADED) {
         element[0].innerHTML = "Make sure to run <code>react_jupyter.init()</code> before this cell.";
     } else {
-        require(['babel', 'react', 'react-dom'], (Babel, React, ReactDOM) => {
+        Promise.all(["babel-standalone@6", "react", "react-dom"].map(x => d3require(x))).then(([Babel, React, ReactDOM]) => {
             const cell = new Cell(element[0]);
             const render = cell.render.bind(cell);
 
             const cleanupManager = cell.cleanupManager.childScope();
             const onCleanup = cleanupManager.register.bind(cleanupManager);
 
+            const require = d3require;
+
             const dependHandle = registry.listen($dependency_list, ({ $dependency_dict }) => {
                 cleanupManager.cleanup(); // Clean up from the previous iteration
                 try {
-                    const babelOutput = Babel.transform($quoted_script, {presets: ['es2015', 'react', 'stage-2']})
+                    const babelOutput = Babel.transform($quoted_script, {presets: ['es2017', 'react', 'stage-0', 'stage-1', 'stage-2']})
                     eval(babelOutput.code);
                 } catch (e) {
                     cell.renderError(e.message);
@@ -64,8 +66,6 @@ def jsx(line, cell):
         }
     """
 
-    code = []
-
     dependency_list = []
     for dep in line.split(" "):
         if len(dep) > 0:
@@ -73,7 +73,7 @@ def jsx(line, cell):
 
     execute_js(
         string.Template(code_template).substitute(
-            quoted_script=json.dumps("\n".join(code + [cell])),
+            quoted_script=json.dumps("(async () => {\n" + cell + "})()\n"),
             dependency_list=json.dumps(dependency_list),
             dependency_dict=", ".join(dependency_list),
         )
