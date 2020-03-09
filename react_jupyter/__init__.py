@@ -19,7 +19,7 @@ class CustomJSONEncoder(json.JSONEncoder):
         if isinstance(o, np.ndarray):
             return o.tolist()
         if isinstance(o, pd.DataFrame):
-            return o.to_json(orient="records")
+            return o.to_dict("records")
         return json.JSONEncoder.default(self, o)
 
 
@@ -73,7 +73,9 @@ def jsx(line, cell):
 
     execute_js(
         string.Template(code_template).substitute(
-            quoted_script=json.dumps("(async () => {\n" + cell + "})()\n"),
+            quoted_script=json.dumps(
+                "(async () => {\n" + cell + "})().catch(e => cell.renderError(e.message))\n"
+            ),
             dependency_list=json.dumps(dependency_list),
             dependency_dict=", ".join(dependency_list),
         )
